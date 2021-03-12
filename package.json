@@ -1,0 +1,40 @@
+{
+  "name": "remote-play",
+  "version": "0.0.1",
+  "description": "An app to local media remotely on web-enabled devices",
+  "main": "build/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shashi20008/remote-play.git"
+  },
+  "author": "Shashi Shekhar <shashi20008@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shashi20008/remote-play/issues"
+  },
+  "homepage": "https://github.com/shashi20008/remote-play#readme",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.17.0",
+    "@typescript-eslint/parser": "^4.17.0",
+    "eslint": "^7.22.0",
+    "eslint-config-prettier": "^8.1.0",
+    "husky": "^5.1.3",
+    "lint-staged": "^10.5.4",
+    "prettier": "^2.2.1"
+  },
+  "dependencies": {},
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "**/*.{js|jsx|json|ts|tsx}": [
+      "eslint --ext .js,.jsx,.ts,.tsx --fix",
+      "prettier --write --ignore-unknown"
+    ]
+  }
+}
