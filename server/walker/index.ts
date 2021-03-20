@@ -4,7 +4,7 @@ import * as fsWalker from '@nodelib/fs.walk';
 import { noop } from 'lodash';
 import debug from 'debug';
 import * as config from '../config/config.json';
-import { VideoCache, VideoCollection, VideoEntry } from '../types';
+import { VideoCache, VideoCollection, VideoEntry } from '../../types';
 import { getVideoDetails } from './probe';
 
 const debuglog = debug('remote-play:walker');

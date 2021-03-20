@@ -7,7 +7,7 @@ import { default as imagemin } from 'imagemin';
 import { default as pngquant } from 'imagemin-pngquant';
 import { promisify } from 'util';
 import { delay, toReadableSize, toTimeStamp } from '../helpers/utils';
-import { VideoDetails } from '../types';
+import { VideoDetails } from '../../types';
 const ffprobeAsync: (path: string) => Promise<FfprobeData> = promisify(ffprobe);
 
 async function getVideoDetails(path: string): Promise<VideoDetails> {
