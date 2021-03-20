@@ -3,14 +3,30 @@ import * as fs from 'fs/promises';
 import * as fsWalker from '@nodelib/fs.walk';
 import debug from 'debug';
 import * as config from '../config/config.json';
-import { VideoCache, VideoCollection } from '../types';
+import { VideoCache, VideoCollection, VideoEntry } from '../types';
+import { getVideoDetails } from './probe';
 
 const debuglog = debug('remote-play:walker');
 
 const VIDEOS = new Map<string, VideoCollection>();
 
+async function isPathValid(path: string): Promise<boolean> {
+  const roots = config.videos.roots || [];
+  if(!roots.some(root => path.startsWith(root))) {
+    return false;
+  }
+
+  try {
+    await fs.access(path);
+    return true;
+  }
+  catch(e) {
+    return false;
+  }
+}
+
 function handleNewFile(root: string, file: fsWalker.Entry) {
-  const { dir, base } = path.parse(file.path);
+  const { dir, base: name } = path.parse(file.path);
 
   if(!VIDEOS.has(root)) {
     VIDEOS.set(root, {});
@@ -21,7 +37,12 @@ function handleNewFile(root: string, file: fsWalker.Entry) {
     rootBase[dir] = [];
   }
 
-  rootBase[dir].push(base);
+  const fullPath = path.join(root, file.path);
+  rootBase[dir].push({
+    name,
+    fullPath,
+    details: null
+  });
 }
 
 function shouldKeepFile(entry: fsWalker.Entry): boolean {
@@ -34,10 +55,10 @@ function shouldIgnoreError(error: Error) {
 }
 
 let populating = false;
-async function populateLibrary(forceReload: boolean = false): Promise<void> {
+async function populateLibrary(forceReload: boolean = false): Promise<boolean> {
   if(populating) {
     debuglog('A library populate request is already in progress.');
-    return;
+    return false;
   }
 
   populating = true;
@@ -45,11 +66,11 @@ async function populateLibrary(forceReload: boolean = false): Promise<void> {
     const done = await populateFromCache();
     if(done) {
       populating = false;
-      return;
+      return false;
     }
   }
 
-  return new Promise<void>(resolve => {
+  return new Promise<boolean>(resolve => {
     const { roots } = config.videos;
     let idx = 0;
 
@@ -59,7 +80,7 @@ async function populateLibrary(forceReload: boolean = false): Promise<void> {
           .catch(() => {})
           .finally(() => {
             populating = false;
-            resolve();
+            resolve(true);
           });
         return;
       }
@@ -81,18 +102,18 @@ async function populateLibrary(forceReload: boolean = false): Promise<void> {
 }
 
 function getLibraries(): VideoCache {
-  return Array.from(VIDEOS.entries())
-    .reduce((all: VideoCache, [key, coll]) => ({
-      ...all,
-      [key]: coll
-    }), {});
+  return Object.fromEntries(VIDEOS);
 }
 
 function getCacheFilename(): string {
-  return path.join(__dirname, '../_library-cache.json');
+  return path.join(__dirname, '../_cache/library-cache.json');
 }
 
-function saveToCache(): Promise<void> {
+async function saveToCache(): Promise<void> {
+  if(VIDEOS.size === 0) {
+    return;
+  }
+
   const serialized = JSON.stringify(Array.from(VIDEOS.entries()));
   let shutdownRequested = false;
 
@@ -144,7 +165,60 @@ async function populateFromCache(): Promise<boolean> {
   }
 }
 
+async function probeAllVideoDetails(): Promise<void> {
+  let count = 0;
+  for(const coll of VIDEOS.values()) {
+    for(const entries of Object.values(coll)) {
+      for(const entry of entries) {
+        if(entry.details !== null) {
+          continue;
+        }
+        entry.details = await getVideoDetails(entry.fullPath);
+        count++;
+
+        if(count % 100 === 0) {
+          await saveToCache();
+        }
+      }
+    }
+  }
+  if(count % 100 !== 0) {
+    await saveToCache();
+  }
+}
+
+async function probeVideoDetails():
+  Promise<void>;
+async function probeVideoDetails(root: string, dir: string, filename: string): 
+  Promise<VideoEntry | undefined>;
+async function probeVideoDetails(...args: string[]) {
+  if(args.length === 0) {
+    return probeAllVideoDetails();
+  }
+
+  const [
+    root, dir, filename
+  ] = args;
+  const coll = VIDEOS.get(root);
+  const entries = coll?.[dir];
+  const entry = entries?.find(({name}) => name === filename);
+
+  if(entry === undefined) {
+    return;
+  }
+
+  if(entry.details === null) {
+    entry.details = await getVideoDetails(entry.fullPath);
+  }
+
+  // @TODO: Save this back to library.
+
+  return entry;
+}
+
 export {
+  isPathValid,
   populateLibrary,
+  probeVideoDetails,
   getLibraries
 };

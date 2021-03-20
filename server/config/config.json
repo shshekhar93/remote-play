@@ -1,14 +1,12 @@
 {
   "videos": {
-    "roots": [
-      "/mnt/nfsshare/Movies",
-      "/mnt/nfsshare/Series"
-    ],
+    "roots": [],
     "extensions": [
       ".mov",
       ".mkv",
       ".avi",
       ".mp4"
-    ]
+    ],
+    "statVideos": true
   }
 }

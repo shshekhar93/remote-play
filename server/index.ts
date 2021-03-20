@@ -1,6 +1,7 @@
 import express from 'express';
-import { populateLibrary } from './walker';
+import { populateLibrary, probeVideoDetails } from './walker';
 import { setupRoutes } from './routes';
+import * as config from './config/config.json';
 
 const app = express();
 
@@ -14,6 +15,12 @@ const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log('application started.');
   populateLibrary()
+    .then((readFromFS) => {
+      console.log('Populated from cache', !readFromFS);
+      if(config.videos.statVideos && readFromFS) {
+        return probeVideoDetails();
+      }
+    })
     .then(() => {
       console.log('library populated')
     });
