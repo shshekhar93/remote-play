@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsWalker from '@nodelib/fs.walk';
+import { noop } from 'lodash';
 import debug from 'debug';
 import * as config from '../config/config.json';
 import { VideoCache, VideoCollection, VideoEntry } from '../types';
@@ -12,15 +13,14 @@ const VIDEOS = new Map<string, VideoCollection>();
 
 async function isPathValid(path: string): Promise<boolean> {
   const roots = config.videos.roots || [];
-  if(!roots.some(root => path.startsWith(root))) {
+  if (!roots.some((root) => path.startsWith(root))) {
     return false;
   }
 
   try {
     await fs.access(path);
     return true;
-  }
-  catch(e) {
+  } catch (e) {
     return false;
   }
 }
@@ -28,12 +28,12 @@ async function isPathValid(path: string): Promise<boolean> {
 function handleNewFile(root: string, file: fsWalker.Entry) {
   const { dir, base: name } = path.parse(file.path);
 
-  if(!VIDEOS.has(root)) {
+  if (!VIDEOS.has(root)) {
     VIDEOS.set(root, {});
   }
 
   const rootBase = VIDEOS.get(root) || {};
-  if(rootBase[dir] === undefined) {
+  if (rootBase[dir] === undefined) {
     rootBase[dir] = [];
   }
 
@@ -41,43 +41,43 @@ function handleNewFile(root: string, file: fsWalker.Entry) {
   rootBase[dir].push({
     name,
     fullPath,
-    details: null
+    details: null,
   });
 }
 
 function shouldKeepFile(entry: fsWalker.Entry): boolean {
   const { extensions = [] } = config.videos;
-  return extensions.some(ext => entry.name.endsWith(ext));
+  return extensions.some((ext) => entry.name.endsWith(ext));
 }
 
-function shouldIgnoreError(error: Error) {
+function shouldIgnoreError(/* error: Error */) {
   return true;
 }
 
 let populating = false;
-async function populateLibrary(forceReload: boolean = false): Promise<boolean> {
-  if(populating) {
+async function populateLibrary(forceReload = false): Promise<boolean> {
+  if (populating) {
     debuglog('A library populate request is already in progress.');
     return false;
   }
 
   populating = true;
-  if(!forceReload) {
+  if (!forceReload) {
     const done = await populateFromCache();
-    if(done) {
+    if (done) {
       populating = false;
       return false;
     }
   }
 
-  return new Promise<boolean>(resolve => {
+  return new Promise<boolean>((resolve) => {
     const { roots } = config.videos;
     let idx = 0;
 
     const loadMore = (): void => {
-      if(idx >= roots.length) {
+      if (idx >= roots.length) {
         saveToCache()
-          .catch(() => {})
+          .catch(noop)
           .finally(() => {
             populating = false;
             resolve(true);
@@ -85,18 +85,19 @@ async function populateLibrary(forceReload: boolean = false): Promise<boolean> {
         return;
       }
 
-      fsWalker.walkStream(roots[idx], {
-        basePath: '',
-        entryFilter: shouldKeepFile,
-        errorFilter: shouldIgnoreError
-      })
+      fsWalker
+        .walkStream(roots[idx], {
+          basePath: '',
+          entryFilter: shouldKeepFile,
+          errorFilter: shouldIgnoreError,
+        })
         .on('data', handleNewFile.bind(null, roots[idx]))
         .on('error', (err) => debuglog('Recursive walk error', err.stack))
         .on('end', () => {
           idx++;
           loadMore();
         });
-    }
+    };
     loadMore();
   });
 }
@@ -110,7 +111,7 @@ function getCacheFilename(): string {
 }
 
 async function saveToCache(): Promise<void> {
-  if(VIDEOS.size === 0) {
+  if (VIDEOS.size === 0) {
     return;
   }
 
@@ -118,18 +119,21 @@ async function saveToCache(): Promise<void> {
   let shutdownRequested = false;
 
   const delayShutdown = () => {
-    console.log('Saving library. The server will shutdown after save is complete.');
+    console.log(
+      'Saving library. The server will shutdown after save is complete.'
+    );
     shutdownRequested = true;
   };
 
   process.once('SIGTERM', delayShutdown);
   process.once('SIGINT', delayShutdown);
-  return fs.writeFile(getCacheFilename(), serialized, 'utf-8')
+  return fs
+    .writeFile(getCacheFilename(), serialized, 'utf-8')
     .catch((err: Error) => {
       debuglog('Save failed:', err.stack);
     })
     .finally(() => {
-      if(shutdownRequested) {
+      if (shutdownRequested) {
         process.exit();
       }
       process.off('SIGTERM', delayShutdown);
@@ -143,9 +147,8 @@ async function populateFromCache(): Promise<boolean> {
     let cache: Map<string, VideoCollection>;
     try {
       cache = new Map(JSON.parse(cacheStr));
-    }
-    catch(e) {
-      throw new Error('PARSEFAIL')
+    } catch (e) {
+      throw new Error('PARSEFAIL');
     }
 
     VIDEOS.clear();
@@ -153,11 +156,10 @@ async function populateFromCache(): Promise<boolean> {
 
     debuglog('Library populated from cache.');
     return true;
-  }
-  catch(e) {
+  } catch (e) {
     // File not found or JSON parse failed.
     // This is okay.
-    if(e.code === 'ENOENT' || e.message === 'PARSEFAIL') {
+    if (e.code === 'ENOENT' || e.message === 'PARSEFAIL') {
       return false;
     }
     console.error('Library read failed.', e.stack);
@@ -167,47 +169,50 @@ async function populateFromCache(): Promise<boolean> {
 
 async function probeAllVideoDetails(): Promise<void> {
   let count = 0;
-  for(const coll of VIDEOS.values()) {
-    for(const entries of Object.values(coll)) {
-      for(const entry of entries) {
-        if(entry.details !== null) {
+  for (const coll of VIDEOS.values()) {
+    for (const entries of Object.values(coll)) {
+      for (const entry of entries) {
+        if (entry.details !== null) {
           continue;
         }
         entry.details = await getVideoDetails(entry.fullPath);
         count++;
 
-        if(count % 100 === 0) {
+        if (count % 100 === 0) {
           await saveToCache();
         }
       }
     }
   }
-  if(count % 100 !== 0) {
+  if (count % 100 !== 0) {
     await saveToCache();
   }
 }
 
-async function probeVideoDetails():
-  Promise<void>;
-async function probeVideoDetails(root: string, dir: string, filename: string): 
-  Promise<VideoEntry | undefined>;
-async function probeVideoDetails(...args: string[]) {
-  if(args.length === 0) {
-    return probeAllVideoDetails();
-  }
-
-  const [
-    root, dir, filename
-  ] = args;
-  const coll = VIDEOS.get(root);
-  const entries = coll?.[dir];
-  const entry = entries?.find(({name}) => name === filename);
-
-  if(entry === undefined) {
+async function probeVideoDetails(): Promise<void>;
+async function probeVideoDetails(
+  root: string,
+  dir: string,
+  filename: string
+): Promise<VideoEntry | void>;
+async function probeVideoDetails(
+  ...args: string[]
+): Promise<VideoEntry | void> {
+  if (args.length === 0) {
+    probeAllVideoDetails();
     return;
   }
 
-  if(entry.details === null) {
+  const [root, dir, filename] = args;
+  const coll = VIDEOS.get(root);
+  const entries = coll?.[dir];
+  const entry = entries?.find(({ name }) => name === filename);
+
+  if (entry === undefined) {
+    return;
+  }
+
+  if (entry.details === null) {
     entry.details = await getVideoDetails(entry.fullPath);
   }
 
@@ -216,9 +221,4 @@ async function probeVideoDetails(...args: string[]) {
   return entry;
 }
 
-export {
-  isPathValid,
-  populateLibrary,
-  probeVideoDetails,
-  getLibraries
-};
+export { isPathValid, populateLibrary, probeVideoDetails, getLibraries };

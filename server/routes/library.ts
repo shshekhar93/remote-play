@@ -5,11 +5,11 @@ import { getLibraries, isPathValid, populateLibrary } from '../walker';
 import { getThumbsDir, takeScreenshots } from '../walker/probe';
 const libraryRouter = express.Router();
 
-libraryRouter.get('/', function(req, res) {
+libraryRouter.get('/', function (req, res) {
   res.json(getLibraries());
 });
 
-libraryRouter.get('/refresh', function(req, res) {
+libraryRouter.get('/refresh', function (req, res) {
   populateLibrary(true); // ignore cache and re-populate from FS.
   res.status(202).end();
 });
@@ -20,20 +20,19 @@ libraryRouter.get('/thumb', (req, res) => {
   const thumb = pathJoin(getThumbsDir(filePathStr), '1.png');
 
   const findThumb = async (tryAgain: boolean) => {
-    if(!await isPathValid(filePathStr)) {
+    if (!(await isPathValid(filePathStr))) {
       return res.status(404).end();
     }
 
     try {
       const fileContents = await readFile(thumb);
       res.header('Content-Type', 'image/png').send(fileContents);
-    }
-    catch(e) {
-      if(e.code !== 'ENOENT') {
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
         return res.status(404).end();
       }
 
-      if(tryAgain) {
+      if (tryAgain) {
         await takeScreenshots(filePathStr);
         findThumb(false);
       }
@@ -43,6 +42,4 @@ libraryRouter.get('/thumb', (req, res) => {
   findThumb(true);
 });
 
-export {
-  libraryRouter
-};
+export { libraryRouter };

@@ -7,7 +7,7 @@ const app = express();
 
 setupRoutes(app);
 
-app.get('*', function(req, res) {
+app.get('*', function (req, res) {
   res.status(404).send('Hey there! You lost?');
 });
 
@@ -17,11 +17,11 @@ app.listen(port, () => {
   populateLibrary()
     .then((readFromFS) => {
       console.log('Populated from cache', !readFromFS);
-      if(config.videos.statVideos && readFromFS) {
+      if (config.videos.statVideos && readFromFS) {
         return probeVideoDetails();
       }
     })
     .then(() => {
-      console.log('library populated')
+      console.log('library populated');
     });
 });
