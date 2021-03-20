@@ -33,8 +33,8 @@
     }
   },
   "lint-staged": {
-    "**/*.{js|jsx|json|ts|tsx}": [
-      "eslint --ext .js,.jsx,.ts,.tsx --fix",
+    "*": [
+      "eslint --ext .js,.jsx,.ts,.tsx,.json --fix",
       "prettier --write --ignore-unknown"
     ]
   }
